@@ -1,1 +1,1 @@
-# BitcoinStudy from Jimmy Song 
+# BitcoinStudy(Core) from Jimmy Song 
