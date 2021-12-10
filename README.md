@@ -1,1 +1,1 @@
-# BitcoinStudy
+# BitcoinStudy from Jimmy Song book
