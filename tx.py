@@ -3,9 +3,12 @@ from io import BytesIO
 import json
 import requests
 
-from helper import (hash256, little_endian_to_int, read_varint, int_to_little_endian)
+from helper import (hash256, little_endian_to_int, read_varint, int_to_little_endian, encode_varint, SIGHASH_ALL)
 
 #수수료
+from script import Script
+
+
 class TxFetcher:
     cache = {}
 
@@ -64,7 +67,7 @@ class Tx:
     def __init__(self, version, tx_ins,tx_outs,locktime, testnet  = False):
         self.version = version
         self.tx_ins = tx_ins
-        self.tx_out = tx_outs
+        self.tx_outs = tx_outs
         self.locktime = locktime
         self.testnet = testnet
 
@@ -84,25 +87,36 @@ class Tx:
         )
 
     def id(self):
-        return self.hash().hax()
+        return self.hash().hex()
+
     def hash(self):
         return hash256(self.serialize())[::-1]
+
     @classmethod
     def parse(cls, s, testnet=False):
         version = little_endian_to_int(s.read(4))
         num_inputs = read_varint(s)
         inputs = []
         for _ in range(num_inputs):
-            inputs(TxIn.parse(s))
+            inputs.append(TxIn.parse(s))
         num_outputs = read_varint(s)
         outputs = []
         for _ in range(num_outputs):
             outputs.append(TxOut.parse(s))
         locktime = little_endian_to_int(s.read(4))
         return cls(version, inputs, outputs, locktime, testnet = testnet)
-    def serialize(self):
-        print(1)
 
+    def serialize(self):
+        result = int_to_little_endian(self.version, 4)
+        result += encode_varint(len(self.tx_ins))
+        for tx_in in self.tx_ins:
+            result += tx_in.serialize()
+        result += encode_varint(len(self.tx_outs))
+
+        for tx_out in self.tx_outs:
+            result += tx_out.serialize()
+        result += int_to_little_endian(self.locktime, 4)
+        return result
     def fee(self, testnet = False):
         input_sum, output_sum =0, 0
         for tx_in in self.tx_ins:
@@ -111,7 +125,53 @@ class Tx:
             output_sum += tx_out.amount
         return input_sum - output_sum
 
+    def sig_hash(self, input_index):
+        s = int_to_little_endian(self.version,4)
+        s += encode_varint(len(self.tx_ins))
 
+        for i, tx_in in enumerate(self.tx_ins):
+            if i == input_index:
+                s += TxIn(
+                    prev_tx = tx_in.prev_tx,
+                    prev_index = tx_in.prev_index,
+                    script_sig= tx_in.script_pubkey(self.testnet),
+                    sequence= tx_in.sequence
+                ).serialize()
+            else:
+                s += TxIn(
+                    prev_tx=tx_in.prev_tx,
+                    prev_index=tx_in.prev_index,
+                    sequence=tx_in.sequence,
+                ).serialize()
+        s += encode_varint(len(self.tx_outs))
+        for tx_out in self.tx_outs:
+            s += tx_out.serialize()
+        s += int_to_little_endian(self.locktime, 4)
+        s += int_to_little_endian(SIGHASH_ALL, 4)
+        h256 = hash256(s)
+        return int.from_bytes(h256, 'big')
+
+    def verify_input(self, input_index):
+        tx_in = self.tx_ins[input_index]
+        script_pubkey = tx_in.script_pubkey(testnet=self.testnet)
+        z = self.sig_hash(input_index)
+        combined = tx_in.script_sig +  script_pubkey
+        return combined.evaluate(z)
+    def verify(self):
+        if self.fee() < 0:
+            return False
+        for i in range(len(self.tx_ins)):
+            if not self.verify_input(i):
+                return False
+        return True
+
+    def sign_input(self, input_index, private_key):
+        z = self.sig_hash(input_index)
+        der = private_key.sign(z).der()
+        sig = der + SIGHASH_ALL.to_bytes(1, 'big')
+        sec = private_key.point.sec()
+        self.tx_ins[input_index].script_sig = Script([sig, sec])
+        return self.verify_input(input_index)
 class TxIn:
     def __init__(self, prev_tx, prev_index, script_sig = None, sequence = 0xffffffff):
         self.prev_tx = prev_tx
@@ -146,7 +206,11 @@ class TxIn:
         return TxFetcher.fetch(self.prev_tx.hex(), testnet=testnet)
     def value(self, testnet = False):
         tx = self.fetch_tx(testnet= testnet)
-        return tx.tx_out[self.prev_index].amount
+        return tx.tx_outs[self.prev_index].amount
+
+    def script_pubkey(self, testnet=False):
+        tx = self.fetch_tx(testnet=testnet)
+        return tx.tx_outs[self.prev_index].script_pubkey
 class TxOut:
 
     def __init__(self, amount, script_pubkey):
@@ -160,3 +224,14 @@ class TxOut:
         amount = little_endian_to_int(s.read(8))
         script_pubkey = Script.parse(s)
         return cls(amount, script_pubkey)
+
+    @classmethod
+    def parse(cls, s):
+        amount = little_endian_to_int(s.read(8))
+        script_pubkey = Script.parse(s)
+        return cls(amount, script_pubkey)
+
+    def serialize(self):
+        result = int_to_little_endian(self.amount, 8)
+        result += self.script_pubkey.serialize()
+        return result

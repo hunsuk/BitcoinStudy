@@ -4,6 +4,8 @@ from unittest import TestCase
 import hashlib
 import hmac
 
+from urllib3.packages.six import BytesIO
+
 from helper import hash160,encode_base58_checksum
 
 
@@ -206,6 +208,30 @@ class S256Point(Point):
             prefix = b'\x00'
         return encode_base58_checksum(prefix +  h160)
 
+    @classmethod
+    def parse(self, sec_bin):
+
+        if sec_bin[0] == 4:
+            x = int.from_bytes(sec_bin[1:33], 'big')
+            y = int.from_bytes(sec_bin[33:65], 'big')
+            return S256Point(x=x, y=y)
+        is_even = sec_bin[0] == 2
+        x = S256Field(int.from_bytes(sec_bin[1:], 'big'))
+
+        alpha = x ** 3 + S256Field(B)
+
+        beta = alpha.sqrt()
+        if beta.num % 2 == 0:
+            even_beta = beta
+            odd_beta = S256Field(P - beta.num)
+        else:
+            even_beta = S256Field(P - beta.num)
+            odd_beta = beta
+        if is_even:
+            return S256Point(x, even_beta)
+        else:
+            return S256Point(x, odd_beta)
+
 
 
 # tag::source10[]
@@ -236,9 +262,31 @@ class Signature:
 
         if sbin[0] & 0x80:
             sbin = b'\x00' + sbin
-        result = bytes([2, len(sbin)]) + sbin
+        result += bytes([2, len(sbin)]) + sbin
         return bytes([0x30,len(result)]) + result
 
+    @classmethod
+    def parse(cls, signature_bin):
+        s = BytesIO(signature_bin)
+        compound = s.read(1)[0]
+        if compound != 0x30:
+            raise SyntaxError("Bad Signature")
+        length = s.read(1)[0]
+        if length + 2 != len(signature_bin):
+            raise SyntaxError("Bad Signature Length")
+        marker = s.read(1)[0]
+        if marker != 0x02:
+            raise SyntaxError("Bad Signature")
+        rlength = s.read(1)[0]
+        r = int.from_bytes(s.read(rlength), 'big')
+        marker = s.read(1)[0]
+        if marker != 0x02:
+            raise SyntaxError("Bad Signature")
+        slength = s.read(1)[0]
+        s = int.from_bytes(s.read(slength), 'big')
+        if len(signature_bin) != 6 + rlength + slength:
+            raise SyntaxError("Signature too long")
+        return cls(r, s)
 
 # end::source11[]
 
