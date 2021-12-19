@@ -4,6 +4,7 @@ SIGHASH_NONE = 2
 SIGHASH_SINGLE = 3
 BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 TWO_WEEKS = 60 * 60 * 24 * 14
+MAX_TARGET = 0xffff * 256**(0x1d - 3)
 def hash256(s):
     return hashlib.sha256(hashlib.sha256(s).digest()).digest()
 def hash160(s):
@@ -107,4 +108,6 @@ def calculate_new_bits(previous_bits, time_differential):
     if time_differential < TWO_WEEKS // 4:
         time_differential = TWO_WEEKS // 4
     new_target = bits_to_target(previous_bits) * time_differential // TWO_WEEKS
+    if new_target > MAX_TARGET:
+        new_target = MAX_TARGET
     return target_to_bits(new_target)

@@ -1,4 +1,8 @@
+import hashlib
 import math
+import struct
+import time
+import random
 
 import tx as transaction
 from urllib3.packages.six import BytesIO
@@ -8,18 +12,40 @@ from ecc import S256Point, Signature
 
 mySecret = 199808281234
 #tx = f6f6bfaf0c24327e49ebcb59c203c21da00b21ffcc922b5e7b30f824e20d781b
-from helper import hash256, little_endian_to_int, bits_to_target, TWO_WEEKS,target_to_bits,calculate_new_bits
-from block import Block
-
+from helper import hash256, little_endian_to_int, bits_to_target, TWO_WEEKS,target_to_bits,calculate_new_bits,int_to_little_endian
+from block import Block, GENESIS_BLOCK, LOWEST_BITS
+from network import NetworkEnvelope, SimpleNode, VersionMessage, VerAckMessage, GetHeadersMessage, HeadersMessage
+import sys
 def print_hi():
-    last_block = Block.parse(BytesIO(bytes.fromhex(
-        '02000020f1472d9db4b563c35f97c428ac903f23b7fc055d1cfc26000000000000000000b3f449\
-fcbe1bc4cfbcb8283a0d2c037f961a3fdf2b8bedc144973735eea707e1264258597e8b0118e5f00474')))
-    first_block = Block.parse(BytesIO(bytes.fromhex('000000203471101bbda3fe307664b3283a9ef0e97d9a38a7eacd8800000000000000000010c8ab\
-a8479bbaa5e0848152fd3c2289ca50e1c3e58c9a4faaafbdf5803c5448ddb845597e8b0118e43a81d3')))
+    from io import BytesIO
+    from network import SimpleNode, GetHeadersMessage, HeadersMessage
+    from block import Block, GENESIS_BLOCK, LOWEST_BITS
+    from helper import calculate_new_bits
+    previous = Block.parse(BytesIO(GENESIS_BLOCK))
+    first_epoch_timestamp = previous.timestamp
+    expected_bits = LOWEST_BITS
+    count = 1
+    node = SimpleNode('mainnet.programmingbitcoin.com', testnet=False)
+    node.handshake()
+    for _ in range(19):
+        getheaders = GetHeadersMessage(start_block=previous.hash())
+        node.send(getheaders)
+        headers = node.wait_for(HeadersMessage)
+        for header in headers.blocks:
+            if not header.check_pow():
+                raise RuntimeError('bad PoW at block {}'.format(count))
+            if header.prev_block != previous.hash():
+                raise RuntimeError('discontinuous block at {}'.format(count))
+            if count % 2016 == 0:
+                time_diff = previous.timestamp - first_epoch_timestamp
+                expected_bits = calculate_new_bits(previous.bits, time_diff)
+                print(expected_bits.hex())
+                first_epoch_timestamp = header.timestamp
+            if header.bits != expected_bits:
+                raise RuntimeError('bad bits at block {}'.format(count))
+            previous = header
+            count += 1
+print_hi()
 
-    print(calculate_new_bits(last_block.bits,last_block.timestamp-first_block.timestamp).hex())
-if __name__ == '__main__':
-    print_hi()
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
