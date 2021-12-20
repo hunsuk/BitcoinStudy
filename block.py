@@ -3,7 +3,7 @@ from helper import (
     bits_to_target,
     hash256,
     int_to_little_endian,
-    little_endian_to_int,
+    little_endian_to_int, merkle_root,
 )
 GENESIS_BLOCK = bytes.fromhex('0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c')
 TESTNET_GENESIS_BLOCK = bytes.fromhex('0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4adae5494dffff001d1aa4ae18')
@@ -11,13 +11,14 @@ LOWEST_BITS = bytes.fromhex('ffff001d')
 
 
 class Block:
-    def __init__(self, version, prev_block, merkle_root, timestamp, bits, nonce):
+    def __init__(self, version, prev_block, merkle_root, timestamp, bits, nonce, tx_hashes = None):
         self.version = version
         self.prev_block = prev_block
         self.merkle_root = merkle_root
         self.timestamp = timestamp
         self.bits = bits
         self.nonce = nonce
+        self.tx_hashes = tx_hashes
     @classmethod
     def parse(cls, s):
         version = little_endian_to_int(s.read(4))
@@ -58,3 +59,8 @@ class Block:
         sha = hash256(self.serialize())
         proof = little_endian_to_int(sha)
         return proof < self.target()
+
+    def validate_merkle_root(self):
+        hashes = [h[::-1] for h in self.tx_hashes]
+        root = merkle_root(hashes)
+        return root[::-1] == self.merkle_root

@@ -4,48 +4,25 @@ import struct
 import time
 import random
 
+import helper
+import merkleblock
 import tx as transaction
 from urllib3.packages.six import BytesIO
-
+from merkleblock import MerkleBlock,MerkleTree
+from helper import *
 import op
 from ecc import S256Point, Signature
 
 mySecret = 199808281234
 #tx = f6f6bfaf0c24327e49ebcb59c203c21da00b21ffcc922b5e7b30f824e20d781b
-from helper import hash256, little_endian_to_int, bits_to_target, TWO_WEEKS,target_to_bits,calculate_new_bits,int_to_little_endian
-from block import Block, GENESIS_BLOCK, LOWEST_BITS
-from network import NetworkEnvelope, SimpleNode, VersionMessage, VerAckMessage, GetHeadersMessage, HeadersMessage
-import sys
+
 def print_hi():
-    from io import BytesIO
-    from network import SimpleNode, GetHeadersMessage, HeadersMessage
-    from block import Block, GENESIS_BLOCK, LOWEST_BITS
-    from helper import calculate_new_bits
-    previous = Block.parse(BytesIO(GENESIS_BLOCK))
-    first_epoch_timestamp = previous.timestamp
-    expected_bits = LOWEST_BITS
-    count = 1
-    node = SimpleNode('mainnet.programmingbitcoin.com', testnet=False)
-    node.handshake()
-    for _ in range(19):
-        getheaders = GetHeadersMessage(start_block=previous.hash())
-        node.send(getheaders)
-        headers = node.wait_for(HeadersMessage)
-        for header in headers.blocks:
-            if not header.check_pow():
-                raise RuntimeError('bad PoW at block {}'.format(count))
-            if header.prev_block != previous.hash():
-                raise RuntimeError('discontinuous block at {}'.format(count))
-            if count % 2016 == 0:
-                time_diff = previous.timestamp - first_epoch_timestamp
-                expected_bits = calculate_new_bits(previous.bits, time_diff)
-                print(expected_bits.hex())
-                first_epoch_timestamp = header.timestamp
-            if header.bits != expected_bits:
-                raise RuntimeError('bad bits at block {}'.format(count))
-            previous = header
-            count += 1
-print_hi()
+    hex_merkle_block = '00000020df3b053dc46f162a9b00c7f0d5124e2676d47bbe7c5d0793a500000000000000ef445fef2ed495c275892206ca533e7411907971013ab83e3b47bd0d692d14d4dc7c835b67d8001ac157e670bf0d00000aba412a0d1480e370173072c9562becffe87aa661c1e4a6dbc305d38ec5dc088a7cf92e6458aca7b32edae818f9c2c98c37e06bf72ae0ce80649a38655ee1e27d34d9421d940b16732f24b94023e9d572a7f9ab8023434a4feb532d2adfc8c2c2158785d1bd04eb99df2e86c54bc13e139862897217400def5d72c280222c4cbaee7261831e1550dbb8fa82853e9fe506fc5fda3f7b919d8fe74b6282f92763cef8e625f977af7c8619c32a369b832bc2d051ecd9c73c51e76370ceabd4f25097c256597fa898d404ed53425de608ac6bfe426f6e2bb457f1c554866eb69dcb8d6bf6f880e9a59b3cd053e6c7060eeacaacf4dac6697dac20e4bd3f38a2ea2543d1ab7953e3430790a9f81e1c67f5b58c825acf46bd02848384eebe9af917274cdfbb1a28a5d58a23a17977def0de10d644258d9c54f886d47d293a411cb6226103b55635'
+    mb = MerkleBlock.parse(BytesIO(bytes.fromhex(hex_merkle_block)))
+
+    print(mb.is_valid())
+if __name__ == '__main__':
+    print_hi()
 
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
