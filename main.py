@@ -11,16 +11,19 @@ from urllib3.packages.six import BytesIO
 from merkleblock import MerkleBlock,MerkleTree
 from helper import *
 import op
-from ecc import S256Point, Signature
+from ecc import S256Point, Signature, PrivateKey
+from network import TX_DATA_TYPE
+from script import p2pkh_script, Script
 
-mySecret = 199808281234
-#tx = f6f6bfaf0c24327e49ebcb59c203c21da00b21ffcc922b5e7b30f824e20d781b
-
+mySecret = 112334489442836185
+mySecret2 = 199882814547789
+#moax16wFkq2c9JyrSwzf9LVNw2goytPNJH
 def print_hi():
-    hex_merkle_block = '00000020df3b053dc46f162a9b00c7f0d5124e2676d47bbe7c5d0793a500000000000000ef445fef2ed495c275892206ca533e7411907971013ab83e3b47bd0d692d14d4dc7c835b67d8001ac157e670bf0d00000aba412a0d1480e370173072c9562becffe87aa661c1e4a6dbc305d38ec5dc088a7cf92e6458aca7b32edae818f9c2c98c37e06bf72ae0ce80649a38655ee1e27d34d9421d940b16732f24b94023e9d572a7f9ab8023434a4feb532d2adfc8c2c2158785d1bd04eb99df2e86c54bc13e139862897217400def5d72c280222c4cbaee7261831e1550dbb8fa82853e9fe506fc5fda3f7b919d8fe74b6282f92763cef8e625f977af7c8619c32a369b832bc2d051ecd9c73c51e76370ceabd4f25097c256597fa898d404ed53425de608ac6bfe426f6e2bb457f1c554866eb69dcb8d6bf6f880e9a59b3cd053e6c7060eeacaacf4dac6697dac20e4bd3f38a2ea2543d1ab7953e3430790a9f81e1c67f5b58c825acf46bd02848384eebe9af917274cdfbb1a28a5d58a23a17977def0de10d644258d9c54f886d47d293a411cb6226103b55635'
-    mb = MerkleBlock.parse(BytesIO(bytes.fromhex(hex_merkle_block)))
+    want = '6a47304402207899531a52d59a6de200179928ca900254a36b8dff8bb75f5f5d71b1cdc26125022008b422690b8461cb52c3cc30330b23d574351872b7c361e9aae3649071c1a7160121035d5c93d9ac96881f19ba1f686f15f009ded7c62efe85a872e6a19b43c15a2937'
+    script_pubkey = BytesIO(bytes.fromhex(want))
+    script = Script.parse(script_pubkey)
 
-    print(mb.is_valid())
+    print(script.serialize().hex() == want)
 if __name__ == '__main__':
     print_hi()
 

@@ -13,6 +13,11 @@ from helper import (
     little_endian_to_int,
     read_varint,
 )
+TX_DATA_TYPE = 1
+BLOCK_DATA_TYPE = 2
+FILTERED_BLOCK_DATA_TYPE = 3
+COMPACT_BLOCK_DATA_TYPE = 4
+
 NETWORK_MAGIC = b'\xf9\xbe\xb4\xd9'
 TESTNET_NETWORK_MAGIC = b'\x0b\x11\x09\x07'
 
@@ -217,6 +222,31 @@ class HeadersMessage:
             if num_txs != 0:
                 raise RuntimeError('number of txs not 0')
         return cls(blocks)
+class GetDataMessage:
+    command = b'getdata'
+
+    def __init__(self):
+        self.data = []  # <1>
+
+    def add_data(self, data_type, identifier):
+        self.data.append((data_type, identifier))  # <2>
+    # end::source1[]
+
+    def serialize(self):
+        result = encode_varint(len(self.data))
+        for data_type, identifier in self.data:
+            result += int_to_little_endian(data_type,4)
+            result += identifier[::-1]
+        return result
+
+class GenericMessage:
+    def __init__(self, command, payload):
+        self.command = command
+        self.payload = payload
+
+    def serialize(self):
+        return self.payload
+
 
 class SimpleNode:
 

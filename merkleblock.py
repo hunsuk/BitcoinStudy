@@ -105,6 +105,7 @@ class MerkleTree:
 
 
 class MerkleBlock:
+    command = b'merkleblock'
 
     def __init__(self, version, prev_block, merkle_root, timestamp, bits, nonce, total, hashes, flags):
         self.version = version

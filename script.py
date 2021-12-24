@@ -6,7 +6,7 @@ from helper import (
     encode_varint,
     int_to_little_endian,
     little_endian_to_int,
-    read_varint,
+    read_varint, h160_to_p2pkh_address, h160_to_p2sh_address, sha256,
 )
 from op import (
     OP_CODE_FUNCTIONS,
@@ -17,8 +17,13 @@ LOGGER = getLogger(__name__)
 
 def p2pkh_script(h160):
     return Script([0x76, 0xa9, h160, 0x88, 0xac])
+def p2sh_script(h160):
+    return Script([0xa9, h160, 0x87])
+def p2wpkh_script(h160):
+    return Script([0x00, h160])
 
-
+def p2wsh_script(h256):
+    return Script([0x00, h256])
 class Script:
     def __init__(self, cmds=None):
         if cmds is None:
@@ -102,7 +107,7 @@ class Script:
         total = len(result)
         return encode_varint(total) + result
 
-    def evaluate(self, z):
+    def evaluate(self, z, witness):
         cmds = self.cmds[:]  # <1>
         stack = []
         altstack = []
@@ -143,6 +148,27 @@ class Script:
                     redeem_script = encode_varint(len(cmd)) + cmd
                     stream = BytesIO(redeem_script)
                     cmds.extend(Script.parse(stream).cmds)
+                # p2wpkh
+                if len(stack) == 2 and stack[0] == b'' and len(stack[1]) == 20:
+                    h160 = stack.pop()
+                    stack.pop()
+                    cmds.extend(witness)
+                    cmds.extend(p2pkh_script(h160).cmds)
+
+                # p2wsh
+                if len(stack) == 2 and stack[0] == b'' and len(stack[1]) == 32:
+                    s256 = stack.pop()
+                    stack.pop()
+                    cmds.extend(witness[:-1])
+                    witness_script = witness[-1]
+                    if s256 != sha256(witness_script):
+                        print('bad sha256 {} vs {}'.format
+                              (s256.hex(), sha256(witness_script).hex()))
+                        return False
+                    stream = BytesIO(encode_varint(len(witness_script))
+                                     + witness_script)
+                    witness_script_cmds = Script.parse(stream).cmds
+                    cmds.extend(witness_script_cmds)
 
         if len(stack) == 0:
             return False  # <8>
@@ -160,3 +186,24 @@ class Script:
         return len(self.cmds) == 3 and self.cmds[0] == 0xa9 \
                and type(self.cmds[1]) == bytes and len(self.cmds[1]) == 20 \
                and self.cmds[2] == 0x87
+
+    def is_p2wpkh_script_pubkey(self):
+        return len(self.cmds) == 2 and self.cmds[0] == 0x00 \
+            and type(self.cmds[1]) == bytes and len(self.cmds[1]) == 20
+
+    def is_p2wsh_script_pubkey(self):
+        return len(self.cmds) == 2 and self.cmds[0] == 0x00 \
+               and type(self.cmds[1]) == bytes and len(self.cmds[1]) == 32
+
+    def address(self, testnet=False):
+
+        if self.is_p2pkh_script_pubkey():
+            #
+            h160 = self.cmds[2]
+
+            return h160_to_p2pkh_address(h160, testnet)
+        elif self.is_p2sh_script_pubkey():  # p2sh
+
+            h160 = self.cmds[1]
+
+            return h160_to_p2sh_address(h160, testnet)
