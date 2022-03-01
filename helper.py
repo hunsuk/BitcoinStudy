@@ -43,6 +43,8 @@ def little_endian_to_int(b):
 def int_to_little_endian(n, length):
     return n.to_bytes(length,'little')
 
+def int_to_big_endian(n,length):
+    return n.to_bytes(length,'big')
 def read_varint(s):
     i = s.read(1)[0]
     if i == 0xfd:

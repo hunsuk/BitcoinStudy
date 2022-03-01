@@ -2,7 +2,7 @@ import random
 import socket
 import struct
 import time
-
+import struct
 from io import BytesIO
 from random import randint
 from block import Block
@@ -75,7 +75,7 @@ class VersionMessage:
             sender_services = 0,
             sender_ip = b"127.0.0.1", sender_port =18333,
             nonce = None, user_agent = 0,
-            latest_block = 0, relay=False):
+            latest_block = 2164261, relay=False):
         self.version = version
         self.services = services
         if timestamp is None:
@@ -98,19 +98,18 @@ class VersionMessage:
         self.relay = relay
 
     def serialize(self):
-        result = int_to_little_endian(self.version,4)
-        result += int_to_little_endian(self.services,8)
-        result += int_to_little_endian(self.timestamp,8)
-        result += int_to_little_endian(self.receiver_services,8)
-        result += self.receiver_ip +int_to_little_endian(0,7)
-        result += self.receiver_port.to_bytes(2,'big')
-        result += int_to_little_endian(self.sender_services, 8)
-        result += self.sender_ip +int_to_little_endian(0,7)
-        result += self.sender_port.to_bytes(2, 'big')
+        result = struct.pack("i",self.version)
+        result += struct.pack("Q",self.services)
+        result += struct.pack("q",self.timestamp)
+        result += struct.pack("Q",self.receiver_services)
+        result += struct.pack(">16s",self.receiver_ip,16)
+        result += struct.pack(">H",self.receiver_port)
+        result += struct.pack("Q",self.sender_services)
+        result += struct.pack(">16s",self.sender_ip)
+        result += struct.pack(">H",self.sender_port)
         result += self.nonce
-        # result += encode_varint(len(self.user_agent))
-        result +=  struct.pack("B", 0)
-        result += int_to_little_endian(self.latest_block, 4)
+        result += struct.pack("B", 0)
+        result += struct.pack("i",self.latest_block)
         if self.relay:
             result += b'\x01'
         else:
